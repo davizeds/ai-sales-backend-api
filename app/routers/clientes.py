@@ -1,5 +1,5 @@
 from app.schemas.cliente_schema import ClienteCreate,ClienteUpdate
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from app.database import SessionLocal
 from app.models.cliente import Cliente
 
@@ -19,7 +19,7 @@ def criacao_cliente(req:ClienteCreate):
     finally:
         db.close()
 
-@router.get("/cliente")
+@router.get("/clientes")
 def buscador():
     db = SessionLocal()
     try:
@@ -33,7 +33,7 @@ def buscador():
 
 
 @router.get("/clientes/{id}")
-def busca_id(id:int):
+def buscar_cliente_por_id(id:int):
     db = SessionLocal()
     try:
         busca=db.query(Cliente).filter(Cliente.id == id).first()
