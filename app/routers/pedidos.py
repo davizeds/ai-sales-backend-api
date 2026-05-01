@@ -36,3 +36,55 @@ def pedido(req: PedidoCreate):
         return {'id_do_pedido':criar_pedido.id,'cliente_id':req.cliente_id,'total':total,'mensagem':'sucesso'}
     finally:
         db.close()
+
+@router.get('/pedidos')
+def listar_pedidos():
+    db = SessionLocal()
+    try:
+        pedidos = db.query(Pedido).all()
+        resultado = []
+        for p in pedidos:
+            itens = db.query(ItemPedido).filter(ItemPedido.pedido_id == p.id).all()
+            lista_itens = [
+                {'produto_id': item.produto_id, 'quantidade': item.quantidade, 'preco_unitario': item.preco_unitario}
+                for item in itens
+]
+            resultado.append({'id': p.id, 'cliente_id': p.cliente_id, 'total': p.total, 'itens': lista_itens})
+        return {'resultado':resultado}
+    finally:
+        db.close()
+
+@router.get('/pedidos/{id}')
+def busca_pedido_por_id(id:int):
+    db = SessionLocal()
+    try:
+        busca = db.query( Pedido ).filter(  Pedido.id == id ).first()
+        if not busca:
+            raise HTTPException( status_code=404, detail='esse id nao existe' )
+        itens=db.query(ItemPedido).filter(ItemPedido.pedido_id==busca.id).all()
+        lista_itens=[]
+        for i in itens:
+            lista_itens.append(
+             {'produto_id': i.produto_id, 'quantidade': i.quantidade, 'preco_unitario': i.preco_unitario})
+        return {'id': busca.id, 'cliente_id': busca.cliente_id, 'total': busca.total, 'itens': lista_itens}
+    finally:
+        db.close()
+
+@router.delete("/pedidos/{id}")
+def deletar(id:int):
+    db = SessionLocal()
+    try:
+        busca = db.query( Pedido ).filter( Pedido.id == id ).first()
+        if not busca:
+            raise HTTPException( status_code=404, detail='esse id nao existe' )
+        itens = db.query( ItemPedido ).filter( ItemPedido.pedido_id == busca.id ).all()
+        for i in itens:
+            produto=db.query( Produto ).filter(Produto.id== i.produto_id ).first()
+            if produto:
+                produto.estoque += i.quantidade
+            db.delete(i)
+        db.delete(busca)
+        db.commit()
+        return {'mensagem':'pedido deletado com sucesso'}
+    finally:
+        db.close()
