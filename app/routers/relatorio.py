@@ -1,5 +1,5 @@
 from app.database import SessionLocal
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from app.models.pedido import Pedido, ItemPedido
 
 router = APIRouter()
