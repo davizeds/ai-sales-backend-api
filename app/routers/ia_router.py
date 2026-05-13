@@ -9,42 +9,68 @@ from app.models.HistoricoIA import HistoricoIA
 router = APIRouter()
 
 @router.post('/ia/perguntar')
-def perguntar(req:PerguntaIA):
-    pergunta=req.pergunta.lower()
-    if 'produto' in pergunta and 'mais vendido' in pergunta:
-        db = SessionLocal()
-        try:
-            resultado=buscador_item_mais_vendido(db)
-            if resultado == None:
-                return {'resposta':'ainda nao ha vendas registradas'}
-            mais_vendido,quantidade=resultado
-            contexto=f'o produto mais vendido foi o produto de id {mais_vendido} com uma quantidade de {quantidade} unidades vendidas'
-            resposta = generate_response( pergunta, contexto )
-            salavar_no_banco=HistoricoIA(pergunta=pergunta,resposta=resposta)
-            db.add(  salavar_no_banco )
+def perguntar(req: PerguntaIA):
+    pergunta = req.pergunta.lower()
+    db = SessionLocal()
+    try:
+        if 'produto' in pergunta and 'mais vendido' in pergunta:
+            resultado = buscador_item_mais_vendido(db)
+            print("RESULTADO PRODUTO MAIS VENDIDO:", resultado)
+            if resultado is None:
+                resposta = "Ainda não há vendas registradas para identificar o produto mais vendido."
+            else:
+                if isinstance(resultado, tuple):
+                    mais_vendido, quantidade = resultado
+                elif isinstance(resultado, dict):
+                    mais_vendido = (
+                        resultado.get("produto")
+                        or resultado.get("produto_id")
+                        or resultado.get("produto_mais_vendido")
+                        or resultado.get("id")
+                    )
+                    quantidade = (
+                        resultado.get("quantidade")
+                        or resultado.get("quantidade_vendida")
+                        or resultado.get("total_quantidade")
+                    )
+                else:
+                    mais_vendido = resultado
+                    quantidade = None
+                if quantidade:
+                    contexto = f"O produto mais vendido foi o produto de id {mais_vendido}, com {quantidade} unidades vendidas."
+                else:
+                    contexto = f"O produto mais vendido foi o produto de id {mais_vendido}."
+                resposta = generate_response(pergunta, contexto)
+            salvar_no_banco = HistoricoIA(
+                pergunta=pergunta,
+                resposta=resposta
+            )
+            db.add(salvar_no_banco)
             db.commit()
-            db.refresh( salavar_no_banco )
+            db.refresh(salvar_no_banco)
             return {'resposta': resposta}
-        finally:
-            db.close()
-
-    elif 'total' in pergunta and 'vendido' in pergunta:
-        db = SessionLocal()
-        try:
+        elif 'total' in pergunta and ('vendido' in pergunta or 'vendi' in pergunta or 'vendas' in pergunta):
             resultado = busca_vendas(db)
-            if resultado == None:
-                return {'resposta': 'ainda nao ha vendas registradas'}
-            total_vendido=resultado
-            contexto = f'o total vendido foi de {total_vendido}'
-            resposta = generate_response( pergunta, contexto )
-            salavar_no_banco = HistoricoIA( pergunta=pergunta, resposta=resposta )
-            db.add(  salavar_no_banco )
+            print("RESULTADO TOTAL VENDIDO:", resultado)
+            if resultado is None:
+                resposta = "Ainda não há vendas registradas."
+            else:
+                contexto = f"O total vendido no sistema foi de R$ {resultado:.2f}."
+                resposta = generate_response(pergunta, contexto)
+            salvar_no_banco = HistoricoIA(
+                pergunta=pergunta,
+                resposta=resposta
+            )
+            db.add(salvar_no_banco)
             db.commit()
-            db.refresh(  salavar_no_banco )
+            db.refresh(salvar_no_banco)
             return {'resposta': resposta}
-        finally:
-            db.close()
-    return {'mensagem':'ainda nao tenho resposta para essa pergunta'}
+        return {
+            'resposta': 'Ainda não tenho resposta para essa pergunta.'
+        }
+
+    finally:
+        db.close()
 
 @router.get('/ia/historico')
 def pegar_historico():
